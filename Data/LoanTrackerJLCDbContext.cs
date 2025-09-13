@@ -19,6 +19,8 @@ namespace LoanTrackerJLC.Data
         public DbSet<tblTransactionHistory> tblTransactionHistories { get; set; }
         public DbSet<tblPaymentProof> tblPaymentProofs { get; set; }
         public DbSet<tblPerson> tblPersons { get; set; }
+        public DbSet<tblLoanType> tblLoanTypes { get; set; }
+        
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -92,7 +94,7 @@ namespace LoanTrackerJLC.Data
                 .HasForeignKey(pp => pp.PaymentHistoryID)
                 .OnDelete(DeleteBehavior.Cascade);
 
-          // Configure tblPerson
+            // Configure tblPerson
             modelBuilder.Entity<tblPerson>().ToTable("tblPerson");
             modelBuilder.Entity<tblPerson>()
                 .HasOne(p => p.User)

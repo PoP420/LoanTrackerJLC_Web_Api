@@ -44,9 +44,10 @@ namespace LoanTrackerJLC.DTOs
     }
 }
 public class LoginResponseDto
-    {
-        public string Message { get; set; }
-        public int UserId { get; set; }
-        public int UserType { get; set; }
-        public bool RequiresMpinSetup { get; set; }
+{
+    public string Message { get; set; }
+    public int UserId { get; set; }
+    public int UserType { get; set; }
+    public bool RequiresMpinSetup { get; set; }
+    public bool RequiresOtp { get; set; }
     }

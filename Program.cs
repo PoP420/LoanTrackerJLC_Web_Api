@@ -15,6 +15,16 @@ builder.Services.AddDbContext<LoanTrackerJLCDbContext>(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+
+/*
+webBuilder.UseKestrel(options =>
+{
+    options.ListenAnyIP(5000, listenOptions =>
+    {
+        listenOptions.UseHttps("path-to-certificate.pfx", "certificate-password");
+    });
+});*/
+
 // Add CORS for development
 builder.Services.AddCors(options =>
 {

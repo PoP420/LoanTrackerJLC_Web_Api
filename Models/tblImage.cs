@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace LoanTrackerJLC.Models
 {
@@ -19,9 +20,11 @@ namespace LoanTrackerJLC.Models
 
         // Navigation properties (optional, but good practice)
         [ForeignKey("loanID")]
+        [JsonIgnore]
         public virtual tblLoan? Loan { get; set; }
 
         [ForeignKey("userID")]
+        [JsonIgnore]
         public virtual tblUser? User { get; set; }
     }
 }

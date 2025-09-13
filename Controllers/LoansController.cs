@@ -386,7 +386,7 @@ namespace LoanTrackerJLC.Controllers
             }
         }
 
-        // GET: api/loans/client/{userId}/summary - Lightweight summary endpoint
+        /* // GET: api/loans/client/{userId}/summary - Lightweight summary endpoint
         [HttpGet("client/{userId}/summary")]
         public async Task<IActionResult> GetClientLoanSummary(int userId)
         {
@@ -428,7 +428,57 @@ namespace LoanTrackerJLC.Controllers
             {
                 return StatusCode(500, new { Message = "Error retrieving loan summary", Error = ex.Message });
             }
+        }*/
+          [HttpGet("client/{userId}/summary")]
+        public async Task<IActionResult> GetClientLoanSummary(int userId)
+        {
+            try
+            {
+                var summary = await (from L in _context.tblLoans
+                    join U in _context.tblUsers on L.UserId equals U.UserId
+                    join LT in _context.tblLoanTransactions on L.LoanId equals LT.LoanID into loanTransactions
+                    from LT in loanTransactions.DefaultIfEmpty()
+                    join PH in _context.tblPaymentHistories on LT.Id equals PH.TrxnID into paymentHistories
+                    from PH in paymentHistories.DefaultIfEmpty()
+                    where L.UserId == userId && L.Status == "Active"
+                    group new { L, U, LT, PH } by new { L.LoanId, U.FullName, L.Amount, L.Total, L.Status } into g
+                    select new
+                    {
+                        LoanId = g.Key.LoanId,
+                        ClientFullName = g.Key.FullName,
+                        LoanAmount = g.Key.Amount,
+                        Total = g.Key.Total,
+                        Status = g.Key.Status,
+                        OutstandingBalance = g
+                            .Where(x => x.LT != null && (x.PH == null || x.PH.Status != "Approved"))
+                            .Sum(x => x.LT != null ? x.LT.TotalDue ?? 0 : 0),
+                        NextPaymentAmount = g
+                            .Where(x => x.LT != null && x.LT.isPaid == false && x.LT.DueDate >= DateTime.Today && 
+                                        (x.PH == null || x.PH.Status == "Rejected"))
+                            .OrderBy(x => x.LT.DueDate)
+                            .Select(x => x.LT.TotalDue)
+                            .FirstOrDefault(),
+                        NextPaymentDate = g
+                            .Where(x => x.LT != null && x.LT.isPaid == false && x.LT.DueDate >= DateTime.Today && 
+                                        (x.PH == null || x.PH.Status == "Rejected"))
+                            .OrderBy(x => x.LT.DueDate)
+                            .Select(x => x.LT.DueDate)
+                            .FirstOrDefault()
+                    }).ToListAsync();
+
+                if (!summary.Any())
+                {
+                    return NotFound(new { Message = "No active loans found for this client." });
+                }
+
+                return Ok(summary);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "Error retrieving loan summary", Error = ex.Message });
+            }
         }
+       
 
         // GET: api/loans/debug/users - Debug endpoint to see available users
         [HttpGet("debug/users")]
@@ -518,7 +568,7 @@ namespace LoanTrackerJLC.Controllers
         }
 
            // POST: api/loans/payments - Submit payment for approval (no immediate loan transaction update)
-        [HttpPost("payments")]
+        /*[HttpPost("payments")]
         public async Task<IActionResult> SubmitPayment([FromForm] PaymentRequestDto paymentRequest, IFormFile? paymentProofImage)
         {
             if (!ModelState.IsValid)
@@ -617,6 +667,128 @@ namespace LoanTrackerJLC.Controllers
                     Status = "Pending",
                     SubmittedAmount = paymentRequest.Amount,
                     TransactionId = loanTransaction.Id,
+                    EstimatedApprovalTime = "24-48 hours",
+                    HasReceipt = paymentProofImage != null
+                });
+            }
+            catch (Exception ex)
+            {
+                await dbTransaction.RollbackAsync();
+                return StatusCode(500, $"An internal error occurred while submitting the payment: {ex.Message}");
+            }
+        }
+        
+*/
+        [HttpPost("payments")]
+        public async Task<IActionResult> SubmitPayment([FromForm] PaymentRequestDto paymentRequest, IFormFile? paymentProofImage)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            // Validate GCashReferenceNo
+            if (!string.IsNullOrEmpty(paymentRequest.GCashReferenceNo) &&
+                (paymentRequest.GCashReferenceNo.Length < 10 || paymentRequest.GCashReferenceNo.Length > 100 ||
+                 !System.Text.RegularExpressions.Regex.IsMatch(paymentRequest.GCashReferenceNo, @"^[a-zA-Z0-9]+$")))
+            {
+                return BadRequest(new { Message = "Invalid GCash Reference Number. It must be 10-100 alphanumeric characters." });
+            }
+
+            using var dbTransaction = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                // Validate LoanID
+                var loan = await _context.tblLoans.FirstOrDefaultAsync(l => l.LoanId == paymentRequest.LoanID);
+                if (loan == null)
+                {
+                    await dbTransaction.RollbackAsync();
+                    return NotFound(new { Message = $"Loan with ID {paymentRequest.LoanID} not found." });
+                }
+
+                // Validate UserID
+                var userExists = await _context.tblUsers.AnyAsync(u => u.UserId == paymentRequest.UserID);
+                if (!userExists)
+                {
+                    await dbTransaction.RollbackAsync();
+                    return NotFound(new { Message = $"User with ID {paymentRequest.UserID} not found." });
+                }
+
+                // Validate the loan transaction exists
+                var loanTransaction = await _context.tblLoanTransactions
+                    .FirstOrDefaultAsync(lt => lt.Id == paymentRequest.LoanTransactionID && lt.LoanID == paymentRequest.LoanID);
+
+                if (loanTransaction == null)
+                {
+                    await dbTransaction.RollbackAsync();
+                    return NotFound(new { Message = $"Loan transaction with ID {paymentRequest.LoanTransactionID} for Loan {paymentRequest.LoanID} not found." });
+                }
+
+                // Check if transaction is already fully paid
+                if (loanTransaction.isPaid == true)
+                {
+                    await dbTransaction.RollbackAsync();
+                    return BadRequest(new { Message = $"Loan transaction with ID {paymentRequest.LoanTransactionID} is already marked as paid." });
+                }
+
+                // Validate payment amount doesn't exceed total due
+                decimal totalDue = Math.Round(loanTransaction.TotalDue ?? 0, 2);
+                decimal amount = Math.Round(paymentRequest.Amount, 2);
+                if (amount > totalDue)
+                {
+                    await dbTransaction.RollbackAsync();
+                    return BadRequest(new { Message = $"Payment amount {amount:C} exceeds total due {totalDue:C}." });
+                }
+
+                // Create Payment History Record with PENDING status
+                var payment = new tblPaymentHistory
+                {
+                    LoanID = paymentRequest.LoanID,
+                    TrxnID = loanTransaction.Id,
+                    Amount = paymentRequest.Amount,
+                    userID = paymentRequest.UserID,
+                    PDate = paymentRequest.PaymentDate ?? DateTime.UtcNow,
+                    Status = "Pending",
+                    SubmittedDate = DateTime.UtcNow,
+                    Remarks = $"Payment submitted for Transaction ID {loanTransaction.Id}. Amount: {paymentRequest.Amount:C}. " +
+                              (string.IsNullOrEmpty(paymentRequest.GCashReferenceNo) ?
+                               "Awaiting approval." : $"GCash Ref: {paymentRequest.GCashReferenceNo}. Awaiting approval.")
+                };
+
+                _context.tblPaymentHistories.Add(payment);
+                await _context.SaveChangesAsync(); // Save payment to get its ID for the image
+
+                // Handle Image Upload (Receipt)
+                if (paymentProofImage != null && paymentProofImage.Length > 0)
+                {
+                    using var memoryStream = new MemoryStream();
+                    await paymentProofImage.CopyToAsync(memoryStream);
+                    var imageBytes = memoryStream.ToArray();
+
+                    var paymentProofRecord = new tblPaymentProof
+                    {
+                        PaymentHistoryID = payment.Id,
+                        ImageData = imageBytes,
+                        FileType = paymentProofImage.ContentType,
+                        FileName = paymentProofImage.FileName,
+                        UploadedTimestamp = DateTime.UtcNow,
+                        GCashReferenceNo = paymentRequest.GCashReferenceNo
+                    };
+                    _context.tblPaymentProofs.Add(paymentProofRecord);
+                    await _context.SaveChangesAsync();
+                }
+
+                await dbTransaction.CommitAsync();
+
+                return Ok(new
+                {
+                    Message = "Payment submitted successfully and is pending approval.",
+                    PaymentId = payment.Id,
+                    Status = "Pending",
+                    SubmittedAmount = paymentRequest.Amount,
+                    TransactionId = loanTransaction.Id,
+                    GCashReferenceNo = paymentRequest.GCashReferenceNo,
                     EstimatedApprovalTime = "24-48 hours",
                     HasReceipt = paymentProofImage != null
                 });

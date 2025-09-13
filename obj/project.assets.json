@@ -4956,11 +4956,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/home/ardendeska/Repos/Newrep/LoanTrackerAppJLC/LoanTrackerJLC/LoanTrackerJLC.csproj",
+      "projectUniqueName": "/home/ardendeska/Desktop/System/LoanTrackerAppJLC/LoanTrackerJLC/LoanTrackerJLC.csproj",
       "projectName": "LoanTrackerJLC",
-      "projectPath": "/home/ardendeska/Repos/Newrep/LoanTrackerAppJLC/LoanTrackerJLC/LoanTrackerJLC.csproj",
+      "projectPath": "/home/ardendeska/Desktop/System/LoanTrackerAppJLC/LoanTrackerJLC/LoanTrackerJLC.csproj",
       "packagesPath": "/home/ardendeska/.nuget/packages/",
-      "outputPath": "/home/ardendeska/Repos/Newrep/LoanTrackerAppJLC/LoanTrackerJLC/obj/",
+      "outputPath": "/home/ardendeska/Desktop/System/LoanTrackerAppJLC/LoanTrackerJLC/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "/home/ardendeska/.nuget/NuGet/NuGet.Config"

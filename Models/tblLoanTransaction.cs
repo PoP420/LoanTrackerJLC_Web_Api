@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LoanTrackerJLC.Models
 {
+    [Table("tblLoanTransactions")]
     public class tblLoanTransaction
     {
         [Key]
@@ -23,6 +24,8 @@ namespace LoanTrackerJLC.Models
         [Column(TypeName = "money")]
         public decimal? TotalDue { get; set; }
 
+        public decimal? PaidAmount { get; set; }
+
         public DateTime? DueDate { get; set; }
 
         public bool? isPaid { get; set; }
@@ -40,8 +43,8 @@ namespace LoanTrackerJLC.Models
         [Column(TypeName = "money")]
         public decimal ServiceFeesDue { get; set; }
 
-        
 
-       
+
+
     }
 }

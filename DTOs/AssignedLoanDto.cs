@@ -6,6 +6,8 @@ namespace LoanTrackerJLC.DTOs
     {
         public tblLoan Loan { get; set; }
         public tblUser Client { get; set; }
-        public tblImage Image { get; set; }
+        public tblImage? Image { get; set; }
+        public tblLoanTransaction? LoanTransaction { get; set; }
+
     }
 }

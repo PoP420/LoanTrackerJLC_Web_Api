@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("LoanTrackerJLC")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0cb6016270384304ab68b88cd8d58ffeeeeeafd8")]
 [assembly: System.Reflection.AssemblyProductAttribute("LoanTrackerJLC")]
 [assembly: System.Reflection.AssemblyTitleAttribute("LoanTrackerJLC")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -24,6 +24,9 @@ namespace LoanTrackerJLC.Models
 
         public DateTime UploadedTimestamp { get; set; }
 
+        [StringLength(100)]
+        public string? GCashReferenceNo { get; set; }
+
         // Navigation property
         [ForeignKey("PaymentHistoryID")]
         public virtual tblPaymentHistory? PaymentHistory { get; set; }

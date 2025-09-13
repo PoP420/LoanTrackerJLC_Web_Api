@@ -33,8 +33,12 @@ namespace LoanTrackerJLC.Controllers
                 .Select(a => new AssignedLoanDto
                 {
                     Loan = a.Loan,
-                    Client = a.Loan.User    
-                })
+                    Client = a.Loan.User,
+                    LoanTransaction = _context.tblLoanTransactions
+                        .Where(t => t.isPaid == true && t.LoanID == a.Loan.LoanId)
+                        .OrderByDescending(t => t.DueDate)
+                        .FirstOrDefault(),
+                     })
                 .ToListAsync();
 
             if (!assignedLoans.Any())
@@ -43,6 +47,18 @@ namespace LoanTrackerJLC.Controllers
             }
 
             return Ok(assignedLoans);
+        }
+
+         [HttpGet("users/{userId}/image")]
+        public async Task<IActionResult> GetUserImage(int userId)
+        {
+            var image = await _context.tblImages.FirstOrDefaultAsync(i => i.userID == userId);
+            if (image == null)
+            {
+                return NotFound(new { Message = "Image not found for this user." });
+            }
+
+            return File(image.img, "image/jpeg"); // Assuming the image is in JPEG format
         }
 
         [HttpGet("person/{userId}")]

@@ -3,9 +3,11 @@ using LoanTrackerJLC.DTOs;
 using LoanTrackerJLC.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System;
 using System.Linq;
+
+
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authorization;
 
 namespace LoanTrackerJLC.Controllers
 {
@@ -20,37 +22,168 @@ namespace LoanTrackerJLC.Controllers
             _context = context;
         }
 
-        // GET: api/statement/account-info/{userId}
-        [HttpGet("account-info/{userId}")]
-        public async Task<IActionResult> GetAccountInfo(int userId)
+        // GET: api/statement/account-statement/{userId}/{loanId}
+        [HttpGet("account-statement/{userId}/{loanId}")]
+        public async Task<IActionResult> GetAccountStatement(int userId, int loanId)
         {
             try
             {
-                var accountInfo = await (from u in _context.tblUsers
-                    join l in _context.tblLoans on u.UserId equals l.UserId
-                    where u.UserId == userId && (l.Status == "Active" || l.Status == "Overdue" || l.Status == "Current")
-                    select new
-                    {
-                        AccountNumber = $"LA-{l.LoanId:D6}",
-                        AccountStatus = l.Status,
-                        ClientName = u.FullName,
-                        LastUpdated = DateTime.UtcNow,
-                        LoanAmount = l.Amount,
-                        TotalAmount = l.Total,
-                        LoanDescription = "Personal Loan", // You can join with LoanType if needed
-                        LoanId = l.LoanId
-                    }).ToListAsync();
-
-                if (!accountInfo.Any())
+                // Validate inputs
+                if (userId <= 0 || loanId <= 0)
                 {
-                    return NotFound(new { Message = "No active accounts found for this user." });
+                    return BadRequest(new { Message = "Invalid UserId or LoanId." });
                 }
 
-                return Ok(accountInfo);
+                // User and Loan Details (including Loan Type)
+                var accountInfo = await (from u in _context.tblUsers
+                                        join l in _context.tblLoans on u.UserId equals l.UserId
+                                        join lt in _context.tblLoanTypes on l.LoanTypeID equals lt.LoanTypeID
+                                        where u.UserId == userId && l.LoanId == loanId
+                                        select new
+                                        {
+                                            UserId = u.UserId,
+                                            FullName = u.FullName,
+                                            UserName = u.UserName,
+                                            LoanId = l.LoanId,
+                                            LoanTypeID = l.LoanTypeID,
+                                            LoanDescription = lt.LoanDescription,
+                                            InterestRate = lt.InterestRate,
+                                            PenaltiesRate = lt.PenaltiesRate,
+                                            MaxTerm = lt.MaxTerm,
+                                            LoanAmount = l.Amount,
+                                            Interest = l.Interest,
+                                            TotalLoanAmount = l.Total,
+                                            LoanTerm = l.LoanTerm,
+                                            LoanStatus = l.Status,
+                                            LoanCreatedDate = l.CreatedDate
+                                        }).FirstOrDefaultAsync();
+
+                if (accountInfo == null)
+                {
+                    return NotFound(new { Message = "No account found for the specified UserId and LoanId." });
+                }
+
+                // Outstanding Balance from tblLoanTransactions
+                var outstandingBalances = await (from ltr in _context.tblLoanTransactions
+                                                where ltr.LoanID == loanId && ltr.isPaid == false
+                                                select new
+                                                {
+                                                    ltr.Id,
+                                                    ltr.LoanID,
+                                                    ltr.PrincipalDue,
+                                                    ltr.InterestDue,
+                                                    ltr.PenaltiesDue,
+                                                    ltr.ServiceFeesDue,
+                                                    ltr.TotalDue,
+                                                    ltr.DueDate,
+                                                    ltr.isPaid,
+                                                    ltr.Remarks,
+                                                    ltr.WeeklyDue,
+                                                    ltr.PenaltyMonthsApplied,
+                                                    ltr.MonthlyDueDate
+                                                })
+                                                .OrderBy(ltr => ltr.DueDate)
+                                                .ToListAsync();
+
+                var totalOutstandingBalance = outstandingBalances.Sum(ltr => ltr.TotalDue);
+
+                // Payment History
+                var paymentHistory = await (from ph in _context.tblPaymentHistories
+                                           where ph.LoanID == loanId && ph.userID == userId
+                                           select new
+                                           {
+                                               ph.Id,
+                                               ph.TrxnID,
+                                               ph.LoanID,
+                                               PaymentAmount = ph.Amount,
+                                               PaymentDate = ph.PDate,
+                                               PaymentStatus = ph.Status,
+                                               ph.SubmittedDate,
+                                               ph.ApprovedDate,
+                                               ph.ApprovedBy,
+                                               ph.RejectionReason,
+                                               ph.ApprovalNotes,
+                                               PaymentRemarks = ph.Remarks
+                                           })
+                                           .OrderByDescending(ph => ph.PaymentDate)
+                                           .ToListAsync();
+
+                // Transaction History
+                var transactionHistory = await (from th in _context.tblTransactionHistories
+                                               where th.LoanID == loanId && th.userID == userId
+                                               select new
+                                               {
+                                                   th.Id,
+                                                   th.TrxnID,
+                                                   th.LoanID,
+                                                   TransactionAmount = th.Amount,
+                                                   TransactionDate = th.PDate,
+                                                   TransactionRemarks = th.Remarks,
+                                                   th.NewAmountOnFee
+                                               })
+                                               .OrderByDescending(th => th.TransactionDate)
+                                               .ToListAsync();
+
+                // Summary of Totals
+                var summary = await (from l in _context.tblLoans
+                                     join lt in _context.tblLoanTypes on l.LoanTypeID equals lt.LoanTypeID
+                                     from ltr in _context.tblLoanTransactions
+                                         .Where(ltr => ltr.LoanID == l.LoanId && ltr.isPaid == false)
+                                         .DefaultIfEmpty()
+                                     from ph in _context.tblPaymentHistories
+                                         .Where(ph => ph.LoanID == l.LoanId && ph.Status == "Approved")
+                                         .DefaultIfEmpty()
+                                     where l.LoanId == loanId && l.UserId == userId
+                                     group new { l, lt, ltr, ph } by new
+                                     {
+                                         l.LoanId,
+                                         lt.LoanDescription,
+                                         l.Amount,
+                                         l.Interest,
+                                         l.Total
+                                     } into g
+                                     select new
+                                     {
+                                         g.Key.LoanId,
+                                         g.Key.LoanDescription,
+                                         OriginalLoanAmount = g.Key.Amount,
+                                         TotalInterest = g.Key.Interest,
+                                         TotalLoanAmount = g.Key.Total,
+                                         TotalOutstandingBalance = g.Sum(x => x.ltr != null ? x.ltr.TotalDue : 0),
+                                         TotalPaymentsMade = g.Sum(x => x.ph != null ? x.ph.Amount : 0)
+                                     }).FirstOrDefaultAsync();
+
+                // Combine all sections into a single response
+                var response = new
+                {
+                    AccountInfo = accountInfo,
+                    OutstandingBalances = outstandingBalances.Select(ob => new
+                    {
+                        ob.Id,
+                        ob.LoanID,
+                        ob.PrincipalDue,
+                        ob.InterestDue,
+                        ob.PenaltiesDue,
+                        ob.ServiceFeesDue,
+                        ob.TotalDue,
+                        ob.DueDate,
+                        ob.isPaid,
+                        ob.Remarks,
+                        ob.WeeklyDue,
+                        ob.PenaltyMonthsApplied,
+                        ob.MonthlyDueDate,
+                        TotalOutstandingBalance = totalOutstandingBalance
+                    }),
+                    PaymentHistory = paymentHistory,
+                    TransactionHistory = transactionHistory,
+                    Summary = summary
+                };
+
+                return Ok(response);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Message = "Error retrieving account info", Error = ex.Message });
+                return StatusCode(500, new { Message = "Error retrieving account statement", Error = ex.Message });
             }
         }
 
@@ -252,79 +385,6 @@ namespace LoanTrackerJLC.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { Message = "Error retrieving transactions", Error = ex.Message });
-            }
-        }
-
-        // POST: api/statement/full-statement
-        [HttpPost("full-statement")]
-        public async Task<IActionResult> GetFullStatement([FromBody] StatementRequestDto request)
-        {
-            try
-            {
-                // Get account info
-                var accountInfoResponse = await GetAccountInfo(request.UserId);
-                if (accountInfoResponse is not OkObjectResult accountInfoOk)
-                {
-                    return accountInfoResponse;
-                }
-
-                // Get account summary
-                var summaryResponse = await GetAccountSummary(request);
-                if (summaryResponse is not OkObjectResult summaryOk)
-                {
-                    return summaryResponse;
-                }
-
-                // Get transactions
-                var transactionsResponse = await GetTransactions(request);
-                if (transactionsResponse is not OkObjectResult transactionsOk)
-                {
-                    return transactionsResponse;
-                }
-
-                var fullStatement = new
-                {
-                    AccountInfo = accountInfoOk.Value,
-                    AccountSummary = summaryOk.Value,
-                    Transactions = transactionsOk.Value
-                };
-
-                return Ok(fullStatement);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { Message = "Error generating full statement", Error = ex.Message });
-            }
-        }
-
-        // POST: api/statement/export-pdf
-        [HttpPost("export-pdf")]
-        public async Task<IActionResult> ExportStatementPdf([FromBody] StatementRequestDto request)
-        {
-            try
-            {
-                var statementResponse = await GetFullStatement(request);
-                if (statementResponse is not OkObjectResult statementOk)
-                {
-                    return statementResponse;
-                }
-
-                // Simple text-based export (you can enhance with proper PDF library)
-                var statement = statementOk.Value;
-                var content = $"STATEMENT OF ACCOUNT\n" +
-                             $"Generated: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC\n" +
-                             $"Period: {request.StartDate:yyyy-MM-dd} to {request.EndDate:yyyy-MM-dd}\n\n" +
-                             $"Account Information:\n" +
-                             $"User ID: {request.UserId}\n" +
-                             $"Loan ID: {request.LoanId}\n\n" +
-                             $"This is a simplified text export. Implement proper PDF generation as needed.\n";
-
-                var bytes = System.Text.Encoding.UTF8.GetBytes(content);
-                return File(bytes, "text/plain", $"statement_{request.UserId}_{DateTime.Now:yyyyMMdd}.txt");
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { Message = "Error exporting statement", Error = ex.Message });
             }
         }
 

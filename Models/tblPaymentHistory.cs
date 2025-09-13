@@ -21,7 +21,6 @@ namespace LoanTrackerJLC.Models
 
         public int? userID { get; set; }
 
-        // NEW: Approval workflow fields (added via migration)
         [Required]
         [MaxLength(20)]
         public string Status { get; set; } = "Pending"; // Pending, Approved, Rejected

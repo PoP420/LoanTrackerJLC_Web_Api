@@ -22,11 +22,14 @@ namespace LoanTrackerJLC.Models
         public decimal? Total { get; set; }
 
         public int? LoanTerm { get; set; }
+        public DateTime CreatedDate { get; set; }
 
         [StringLength(50)]
         public string? Status { get; set; }
 
         [ForeignKey("UserId")]
         public virtual tblUser? User { get; set; }
+
+        
     }
 }

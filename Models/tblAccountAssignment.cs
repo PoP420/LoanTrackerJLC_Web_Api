@@ -19,7 +19,7 @@ namespace LoanTrackerJLC.Models
 
         [Required]
         [StringLength(50)]
-        public string Status { get; set; }
+        public string? Status { get; set; }
 
         public string? Notes { get; set; }
 
@@ -32,5 +32,6 @@ namespace LoanTrackerJLC.Models
 
         [ForeignKey("AssignedByUserID")]
         public virtual tblUser? AssignedByUser { get; set; }
+        public byte[]? Image { get; set; } // Optional: to store an image related to the assignment, if needed
     }
 }

@@ -25,6 +25,8 @@ namespace LoanTrackerJLC.Models
 
     }
 
+    
+
     public class PaymentMdl
     {
         public int? PayID { get; set; }
@@ -51,8 +53,8 @@ namespace LoanTrackerJLC.Models
         public float? Total { get; set; }
         public int? LoanTerm { get; set; }
         public string? LoanDescription { get; set; }
-        public string? img { get; set; }
-        public byte[] IDPicture { get; set; }
+        public byte[]? img { get; set; }
+        public byte[]? IDPicture { get; set; }
         public string? Status { get; set; } // New property for loan status
 
     }
@@ -67,7 +69,7 @@ namespace LoanTrackerJLC.Models
         public float? ServiceFeesDue { get; set; } // Added for new service fees
         public float? TotalDue { get; set; }
         public DateTime? DueDate { get; set; }
-        public string? img { get; set; }
+        public byte[]? img { get; set; }
         public string? Remarks { get; set; }
         public bool? isPaid { get; set; }
         public string? lastname { get; set; }
@@ -153,8 +155,8 @@ namespace LoanTrackerJLC.Models
         public string? Code { get; set; }
         public string? Value { get; set; }
         public string? FileType { get; set; }
-        public byte[] ActualSize { get; set; }
-        public string Description { get; set; }
+        public byte[]? ActualSize { get; set; }
+        public string? Description { get; set; }
         public DateTime? DateModified { get; set; }
 
 
@@ -167,7 +169,7 @@ namespace LoanTrackerJLC.Models
         public int CollectorUserID { get; set; } // Foreign Key to tblUser.UserId (for the collector)
         public int AssignedByUserID { get; set; } // Foreign Key to tblUser.UserId (for the admin/clerk)
         public DateTime AssignmentTimestamp { get; set; }
-        public string Status { get; set; } // e.g., "Assigned", "In Progress", "Collected", "Escalated"
+        public string? Status { get; set; } // e.g., "Assigned", "In Progress", "Collected", "Escalated"
                                            // Consider using an enum for better type safety and consistency
         public string? Notes { get; set; }
 
